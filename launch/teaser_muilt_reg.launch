@@ -1,0 +1,21 @@
+<launch>
+  <!-- 启动 teaser_muilt_reg_node -->
+  <node
+    pkg="teaser_muilt_reg"
+    type="teaser_muilt_reg_node"
+    name="teaser_muilt_reg_node"
+    output="screen"
+    respawn="false"
+    >
+    <!-- 节点参数 -->
+    <!-- <param name="src_pcd" value="/home/kilox/bag_test/pcd_test/fused_trans.pcd" /> -->
+    <!-- <param name="tgt_pcd" value="/home/kilox/bag_test/pcd_test/point3d_target.pcd" /> -->
+    <!-- <param name="out_transformed_full"  value="/home/kilox/bag_test/pcd_test/transformed_cloud_test3.pcd"/> -->
+    <!-- <param name="out_trans_final"       value="/home/kilox/bag_test/pcd_test/trans_form_final.pcd"/> -->
+    <param name="voxel_leaf"            value="0.05" />
+    <param name="teaser_scale"          value="60.0" />
+    <param name="leaf_xyz_inormal"      value="0.05"/>
+    <param name="leaf_xyz"              value="0.10"/>
+  </node>
+</launch>
+

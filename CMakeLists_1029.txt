@@ -1,0 +1,125 @@
+cmake_minimum_required(VERSION 3.10)
+project(teaser_muilt_reg LANGUAGES CXX C)
+
+# ========= 基本编译选项 =========
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+# 新版 CMake 对旧模块的提醒（可选压制）
+# if(POLICY CMP0148)
+#   cmake_policy(SET CMP0148 OLD)
+# endif()
+
+# ========= ROS & 依赖 =========
+find_package(catkin REQUIRED COMPONENTS
+  roscpp
+  std_msgs
+  sensor_msgs
+  pcl_ros
+)
+
+find_package(PCL REQUIRED COMPONENTS common io filters)
+find_package(Eigen3 QUIET)
+find_package(OpenMP)
+# visualization 组件是一个可视化组建 可以加上
+# TEASER++ 依赖 Eigen，通常已随 PCL 带上；单独找一下（可选）
+
+
+catkin_package(
+  CATKIN_DEPENDS roscpp std_msgs sensor_msgs pcl_ros
+)
+
+# ========= 头文件/库目录 =========
+add_definitions(${PCL_DEFINITIONS})
+link_directories(${PCL_LIBRARY_DIRS})
+# 只是辅助（告诉去哪里找库），只有当库不在系统默认路径时才需要。
+
+# ========= TEASER++ 源码（方式：内嵌编进来）=========
+# 目录根：请确保这些相对路径存在
+set(TEASER_ROOT         ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/TEASER-plusplus/teaser)
+set(TEASER_INC_DIR      ${TEASER_ROOT}/include)
+set(TEASER_TINYPLY_TP   ${TEASER_ROOT}/tinyply/third-party)
+set(TEASER_PMC_INC_DIR  ${TEASER_ROOT}/pmc/include)
+set(TEASER_SPECTRA_INC  ${TEASER_ROOT}/spectra/include)
+set(TEASER_PMC_DIR      ${TEASER_ROOT}/pmc) # PMC 子模块目录(这个版本没有)
+set(TEASER_SRC_DIR      ${TEASER_ROOT}/src)
+# 可选：示例中用到的 fpfh demo（若你需要）
+set(TEASER_EXAMPLE_DIR  ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/TEASER-plusplus/examples/teaser_cpp_fpfh)
+
+# 收集 TEASER 源文件（遵循你看到的 AUX_SOURCE_DIRECTORY 用法）
+AUX_SOURCE_DIRECTORY(${TEASER_SRC_DIR}                         SRC_LIST_TEASER)
+AUX_SOURCE_DIRECTORY(${TEASER_ROOT}/spectra/benchmark          SRC_LIST_BENCHMARK)
+# PMC 子模块需要手动枚举（保持与示例方式一致）
+set(SRC_LIST_PMC
+  ${TEASER_PMC_DIR}/pmc_clique_utils.cpp
+  ${TEASER_PMC_DIR}/pmc_cores.cpp
+  ${TEASER_PMC_DIR}/pmc_driver.cpp
+  ${TEASER_PMC_DIR}/pmc_graph.cpp
+  ${TEASER_PMC_DIR}/pmc_heu.cpp
+  ${TEASER_PMC_DIR}/pmc_lib.cpp
+  ${TEASER_PMC_DIR}/pmc_maxclique.cpp
+  ${TEASER_PMC_DIR}/pmc_utils.cpp
+  ${TEASER_PMC_DIR}/pmcx_maxclique_basic.cpp
+  ${TEASER_PMC_DIR}/pmcx_maxclique.cpp
+)
+
+# 如果你确实需要把官方示例也一起编入（通常不需要），取消下面注释：
+# set(SRC_TEASER_EXAMPLE ${TEASER_EXAMPLE_DIR}/teaser_cpp_fpfh.cc)
+
+# ========= 你的工程源码 =========
+set(SRC_NODE
+  src/teaser_muilt_reg_node.cpp
+  # 如果 map_icp_teaser_icp/test_match2 在本包里实现，取消注释
+  # src/map_icp_teaser_icp.cpp
+  # src/test_match2.cpp
+)
+
+# ========= 头文件包含 =========
+# 统一放到 target_include_directories，避免全局污染
+# 但 tinyply 的 third-party、pmc、spectra、teaser include 需要加进来
+set(ALL_INCLUDE_DIRS
+  ${catkin_INCLUDE_DIRS}
+  ${PCL_INCLUDE_DIRS}
+  ${TEASER_TINYPLY_TP}
+  ${TEASER_INC_DIR}
+  ${TEASER_PMC_INC_DIR}
+  ${TEASER_SPECTRA_INC}
+  ${TEASER_EXAMPLE_DIR} # 如果你用了示例源文件
+  ${EIGEN3_INCLUDE_DIR} # 可能为空，没关系
+)
+
+# ========= 目标可执行文件 =========
+add_executable(teaser_muilt_reg_node
+  ${SRC_NODE}
+  ${SRC_LIST_TEASER}
+  # ${SRC_LIST_PMC}
+  ${SRC_LIST_BENCHMARK}
+  # ${SRC_TEASER_EXAMPLE}  # 若需要把示例编入，这里解除注释
+)
+
+target_include_directories(teaser_muilt_reg_node PUBLIC ${ALL_INCLUDE_DIRS})
+
+if(OpenMP_CXX_FOUND)
+  message(STATUS "OpenMP found: ${OpenMP_CXX_VERSION}")
+  target_link_libraries(teaser_muilt_reg_node PUBLIC OpenMP::OpenMP_CXX)
+  target_compile_options(teaser_muilt_reg_node PUBLIC ${OpenMP_CXX_FLAGS})
+else()
+  message(WARNING "OpenMP not found; try fallback to -fopenmp / -lgomp")
+  target_compile_options(teaser_muilt_reg_node PUBLIC -fopenmp)
+  target_link_libraries(teaser_muilt_reg_node PUBLIC gomp)
+endif()
+
+target_link_libraries(teaser_muilt_reg_node
+  ${catkin_LIBRARIES}
+  ${PCL_LIBRARIES}
+)
+
+add_dependencies(teaser_muilt_reg_node ${catkin_EXPORTED_TARGETS})
+
+# ========= 安装（可选） =========
+# install(TARGETS teaser_muilt_reg_node
+#   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+# install(DIRECTORY launch/
+#   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
+#   FILES_MATCHING PATTERN "*.launch")
