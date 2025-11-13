@@ -592,7 +592,7 @@ Eigen::Matrix4d transform_teaser_method(pcl::PointCloud<pcl::PointXYZINormal>::P
           << "width="  << obj_descriptors->width
           << " height="<< obj_descriptors->height << "\n";
 
-  auto scene_descriptors = fpfh.computeFPFHFeatures(tgt_cloud, 0.02*scale_value, 0.04*scale_value);
+  auto scene_descriptors/* 33位描述子*/ = fpfh.computeFPFHFeatures(tgt_cloud, 0.02*scale_value, 0.04*scale_value);
     std::cout << "scene_desc size = " << scene_descriptors->size() << "\n"
             << "width="  << scene_descriptors->width
             << " height="<< scene_descriptors->height << "\n";
@@ -609,7 +609,7 @@ Eigen::Matrix4d transform_teaser_method(pcl::PointCloud<pcl::PointXYZINormal>::P
 
   teaser::Matcher matcher;  // 返回描述子特征 correspondences = vector< >
   auto correspondences = matcher.calculateCorrespondences( /* 一个存放匹配对索引的容器 每个元素 (i, j) 表示 “src_cloud[i] 与 tgt_cloud[j] 匹配”*/
-    src_cloud, tgt_cloud, *obj_descriptors, *scene_descriptors, false/*true 使用绝对尺度*/, true, false, 0.95);
+    src_cloud, tgt_cloud, *obj_descriptors, *scene_descriptors, true/*true 使用绝对尺度 估计<物体 场景> 开启这个对离群点极为敏感*/, true, true, 0.7/*0.95*/);
     std::cout << "!! Agatha Found " << correspondences.size() << " correspondences." << std::endl;
 
   // Run TEASER++ registration
@@ -763,7 +763,7 @@ Eigen::Matrix4d map_icp_teaser_icp(pcl::PointCloud<pcl::PointXYZINormal>::Ptr& s
 // XXX target是车，source是场景
     std::cout<<"source_merge_cloud size:"<<source_merge_cloud->points.size()<<std::endl;
     std::cout<<"target_merge_cloud size:"<<target_merge_cloud->points.size()<<std::endl;
-    /** 降采样*/
+    /** 降采样 自添加*/
     pcl::PointCloud<pcl::PointXYZINormal>::Ptr source_merge_cloud_downsample(new pcl::PointCloud<pcl::PointXYZINormal>);
     *source_merge_cloud_downsample = downsample_laser_cloud3<pcl::PointXYZINormal>(source_merge_cloud, 0.05);       // TODO 这里做了一个降采样 1031 未细看 Q:这里的降采样会不会影响形状特征 从而影响discreaptor
     /* *解引用运算符 */

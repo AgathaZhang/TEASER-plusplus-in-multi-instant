@@ -55,7 +55,7 @@ private:
 
   std::vector<std::pair<int, int>> corres_;
   std::vector<teaser::PointCloud> pointcloud_;
-  std::vector<Feature> features_;
+  std::vector<Feature> features_;   // src tgt 层的特征
   std::vector<Eigen::Vector3f, Eigen::aligned_allocator<Eigen::Vector3f>> means_; // for normalization
   float global_scale_;
 };

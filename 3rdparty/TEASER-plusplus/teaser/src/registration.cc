@@ -553,7 +553,8 @@ teaser::RobustRegistrationSolver::computeTIMs(const Eigen::Matrix<double, 3, Eig
 teaser::RegistrationSolution
 teaser::RobustRegistrationSolver::solve(const teaser::PointCloud& src_cloud,
                                         const teaser::PointCloud& dst_cloud,
-                                        const std::vector<std::pair<int, int>> correspondences) {
+                                        const std::vector<std::pair<int, int>> correspondences) 
+  {
   Eigen::Matrix<double, 3, Eigen::Dynamic> src(3, correspondences.size());
   Eigen::Matrix<double, 3, Eigen::Dynamic> dst(3, correspondences.size());
   for (size_t i = 0; i < correspondences.size(); ++i) {
@@ -596,7 +597,7 @@ teaser::RobustRegistrationSolver::solve(const Eigen::Matrix<double, 3, Eigen::Dy
    *
    * Estimate Translation
    */
-  src_tims_ = computeTIMs(src, &src_tims_map_);
+  src_tims_ = computeTIMs(src, &src_tims_map_);   // 平移不变测量
   dst_tims_ = computeTIMs(dst, &dst_tims_map_);
   TEASER_DEBUG_INFO_MSG(
       "Starting scale solver (only selecting inliers if scale estimation has been disabled).");

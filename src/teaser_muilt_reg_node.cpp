@@ -6,10 +6,13 @@
 #include <pcl/io/pcd_io.h>
 
 #include <pcl/PCLPointCloud2.h> // agatha add
+#include <pcl/filters/voxel_grid.h>
 #include <pcl/io/ply_io.h> 
 #include <pcl/conversions.h>  
 #include <pcl/common/io.h> 
-#include <pcl/conversions.h>  
+#include <pcl/conversions.h>
+#include <map>
+#include <limits>
 
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/common/transforms.h>
@@ -28,6 +31,75 @@
 //     const pcl::PointCloud<pcl::PointXYZ>::Ptr& src_ds,
 //     const pcl::PointCloud<pcl::PointXYZ>::Ptr& tgt_ds,
 //     const Eigen::Affine3f& init_guess);
+
+// downsample.hpp
+#pragma once
+#include <map>
+#include <limits>
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
+#include <pcl/filters/voxel_grid.h>
+
+namespace teaser_agatha {
+  namespace ds {
+
+  inline int signf(float v) { return (v > 0) - (v < 0); }
+
+  template <typename T>
+  pcl::PointCloud<T> downsample(typename pcl::PointCloud<T>::ConstPtr cloud,
+                                float leaf_size,
+                                float resolution = 10.0f) {
+    pcl::VoxelGrid<T> voxel;
+    typename pcl::PointCloud<T>::Ptr pc_rigid(new pcl::PointCloud<T>());
+    typename pcl::PointCloud<T>::Ptr tmp(new pcl::PointCloud<T>());
+
+    pcl::PointCloud<T> out; // 返回值（按值返回）
+
+    float max_x = -std::numeric_limits<float>::infinity();
+    float max_y = -std::numeric_limits<float>::infinity();
+    float max_z = -std::numeric_limits<float>::infinity();
+    float min_x =  std::numeric_limits<float>::infinity();
+    float min_y =  std::numeric_limits<float>::infinity();
+    float min_z =  std::numeric_limits<float>::infinity();
+
+    std::map<int, std::map<int, typename pcl::PointCloud<T>::Ptr>> meta_group;
+
+    for (const auto& pt : cloud->points) {
+      if (!std::isfinite(pt.x) || !std::isfinite(pt.y) || !std::isfinite(pt.z))
+        continue;
+
+      pc_rigid->push_back(pt);
+
+      max_x = std::max(max_x, pt.x); max_y = std::max(max_y, pt.y); max_z = std::max(max_z, pt.z);
+      min_x = std::min(min_x, pt.x); min_y = std::min(min_y, pt.y); min_z = std::min(min_z, pt.z);
+
+      int col = static_cast<int>(pt.x / resolution + signf(pt.x) * 0.5f);
+      int row = static_cast<int>(pt.y / resolution + signf(pt.y) * 0.5f);
+
+      auto& cell = meta_group[row][col];
+      if (!cell) cell.reset(new pcl::PointCloud<T>());
+      cell->push_back(pt);
+    }
+
+    voxel.setLeafSize(leaf_size, leaf_size, leaf_size);
+
+    for (auto& row_group : meta_group) {
+      for (auto& kv : row_group.second) {
+        auto& cell_cloud = kv.second;
+        if (!cell_cloud || cell_cloud->empty()) continue;
+
+        voxel.setInputCloud(cell_cloud);
+        tmp->clear();
+        voxel.filter(*tmp);     // 写到 tmp
+        out += *tmp;            // 叠加
+      }
+    }
+
+    return out;
+    }
+  } // namespace ds
+}   // namespace teaser_agatha
+
 
 int main(int argc, char** argv)
 {
@@ -65,11 +137,11 @@ int main(int argc, char** argv)
 
   // ---------- 1) 读取参数 ----------
   
-  // std::string src_pcd = "/home/kilox/cloud_mapping/src/teaser_muilt_reg/data/clean_data/render_color_point_scene_2.pcd";
-  // std::string tgt_pcd = "/home/kilox/cloud_mapping/src/teaser_muilt_reg/data/clean_data/render_color_point_car_1.pcd";
+  std::string src_pcd = "/home/kilox/cloud_mapping/src/teaser_muilt_reg/data/clean_data/render_color_point_scene_2.pcd";
+  std::string tgt_pcd = "/home/kilox/cloud_mapping/src/teaser_muilt_reg/data/clean_data/render_color_point_car_1.pcd";
   // std::string tgt_pcd = "/home/kilox/catkin_r3live/data/fire2/shitang_map.pcd";
-  std::string src_pcd/*out_pcd1 转换ply时配合使用*/ = "/home/kilox/cloud_mapping/src/teaser_muilt_reg/data/output/transformed_cloud_ply_1.pcd";
-  std::string tgt_pcd/*out_pcd2*/ = "/home/kilox/cloud_mapping/src/teaser_muilt_reg/data/output/transformed_cloud_ply_2.pcd";
+  // std::string src_pcd/*out_pcd1 转换ply时配合使用*/ = "/home/kilox/cloud_mapping/src/teaser_muilt_reg/data/output/transformed_cloud_ply_1.pcd";
+  // std::string tgt_pcd/*out_pcd2*/ = "/home/kilox/cloud_mapping/src/teaser_muilt_reg/data/output/transformed_cloud_ply_2.pcd";
   std::string out_pcd1 = "/home/kilox/cloud_mapping/src/teaser_muilt_reg/data/output/transformed_cloud_ply_1.pcd";
   std::string out_pcd2= "/home/kilox/cloud_mapping/src/teaser_muilt_reg/data/output/transformed_cloud_ply_2.pcd";
 
@@ -78,7 +150,7 @@ int main(int argc, char** argv)
 
   double leaf_xyz_inormal = 0.02;   // 第一阶段：对 target(PointXYZINormal) 做体素滤波
   double leaf_xyz         = 0.10;   // 第二阶段：对 XYZ 再体素
-  double teaser_scale     = 60.0;   // 你代码里 ld_map_icp_teaser_scale
+  double teaser_scale     = 10.0;   // 你代码里 ld_map_icp_teaser_scale
 
   nh.param<std::string>("src_pcd", src_pcd, src_pcd/* 默认值*/);
   nh.param<std::string>("tgt_pcd", tgt_pcd, tgt_pcd);
@@ -232,38 +304,9 @@ int main(int argc, char** argv)
     
   }
 
-    // if (true)
-    //   {
-    //       std::string src_ply = "/home/kilox/cloud_mapping/src/TEASER-plusplus_or/examples/example_data/3dmatch_sample/cloud_bin_2.ply";
-    //       std::string tgt_pcd = "/home/kilox/cloud_mapping/src/TEASER-plusplus_or/examples/example_data/3dmatch_sample/cloud_bin_36.pcd";
-
-    //       pcl::PCLPointCloud2 src_blob, tgt_blob;
-
-    //       // 正确的读取接口：PLY 用 loadPLYFile，PCD 用 loadPCDFile
-    //       if (pcl::io::loadPLYFile(src_ply, src_blob) < 0) {
-    //           std::cerr << "[main] Cannot open PLY: " << src_ply << "\n"; return 2;
-    //       }
-    //       if (pcl::io::loadPCDFile(tgt_pcd, tgt_blob) < 0) {
-    //           std::cerr << "[main] Cannot open PLY: " << tgt_pcd << "\n"; return 2;
-    //       }
-
-    //       pcl::PointCloud<pcl::PointXYZINormal>::Ptr cloud_source, cloud_target;
-    //       if (!ply2pcd(src_blob, cloud_source)) { std::cerr << "[main] Convert src failed.\n"; return 3; }
-    //       if (!ply2pcd(tgt_blob, cloud_target)) { std::cerr << "[main] Convert tgt failed.\n"; return 3; }
-
-    //       // 用不同文件名分别保存，避免覆盖
-    //       std::string out_src = "/tmp/cloud_src_xyzInormal.pcd";
-    //       std::string out_tgt = "/tmp/cloud_tgt_xyzInormal.pcd";
-    //       if (pcl::io::savePCDFileBinary(out_src, *cloud_source) < 0) { std::cerr << "[main] Save failed: " << out_src << "\n"; return 4; }
-    //       if (pcl::io::savePCDFileBinary(out_tgt, *cloud_target) < 0) { std::cerr << "[main] Save failed: " << out_tgt << "\n"; return 4; }
-    //       std::cout << "[main] Written:\n  " << out_src << "\n  " << out_tgt << "\n";
-    //   }
-
-  
-
 
   // ---------- 4) TEASER 配准（保持你的调用与顺序） ----------
-  ROS_INFO("begin teaser registration");
+  ROS_INFO("begin teaser registration");    // XXX 纯读入无操作
   Eigen::Matrix4d ext_param = map_icp_teaser_icp(cloud_source, cloud_target, static_cast<float>(teaser_scale));
   // TODO 搞清楚这个是图到物的变换还是物到图的变换
   // ---------- 5) 提取 R,t 并构造仿射变换 ----------
@@ -277,10 +320,13 @@ int main(int argc, char** argv)
   transform.pretranslate(translation.cast<float>());
 
   // ---------- 6) 应用第一次变换到 source 并保存 ----------
-  pcl::PointCloud<pcl::PointXYZINormal> transformed_cloud;
-  pcl::transformPointCloud(*cloud_source, transformed_cloud, transform);
-  ROS_INFO_STREAM("transformed_cloud size: " << transformed_cloud.size());
-  if (pcl::io::savePCDFileBinary(out_transformed_full, transformed_cloud) != 0) {
+  pcl::PointCloud<pcl::PointXYZINormal>::Ptr transformed_cloud(new pcl::PointCloud<pcl::PointXYZINormal>());
+  pcl::transformPointCloud(*cloud_source, *transformed_cloud, transform);
+  ROS_INFO_STREAM("transformed_cloud size: " << transformed_cloud->size());
+  /** 降采样输出 */
+  pcl::PointCloud<pcl::PointXYZINormal>::Ptr source_merge_cloud_downsample(new pcl::PointCloud<pcl::PointXYZINormal>());
+  *source_merge_cloud_downsample = teaser_agatha::ds::downsample<pcl::PointXYZINormal>(transformed_cloud, 0.05f);
+  if (pcl::io::savePCDFileBinary(out_transformed_full, *source_merge_cloud_downsample) != 0) {
     ROS_WARN_STREAM("Failed to save PCD: " << out_transformed_full);
   } else {
     ROS_INFO_STREAM("Saved: " << out_transformed_full);
