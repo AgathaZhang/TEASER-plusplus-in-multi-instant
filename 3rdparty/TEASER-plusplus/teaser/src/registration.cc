@@ -407,7 +407,7 @@ void teaser::QuatroSolver::solveForRotation(
   (*rotation).block<2, 2>(0, 0) = rotation_2d;
 }
 
-void teaser::TLSScaleSolver::solveForScale(const Eigen::Matrix<double, 3, Eigen::Dynamic>& src,
+void teaser::TLSScaleSolver::solveForScale(const Eigen::Matrix<double, 3, Eigen::Dynamic>& src,  
                                            const Eigen::Matrix<double, 3, Eigen::Dynamic>& dst,
                                            double* scale,
                                            Eigen::Matrix<bool, 1, Eigen::Dynamic>* inliers) {
@@ -425,14 +425,14 @@ void teaser::TLSScaleSolver::solveForScale(const Eigen::Matrix<double, 3, Eigen:
 }
 
 void teaser::ScaleInliersSelector::solveForScale(
-    const Eigen::Matrix<double, 3, Eigen::Dynamic>& src,
+    const Eigen::Matrix<double, 3, Eigen::Dynamic>& src,  /** 三维点的TIM组合Cn2*/
     const Eigen::Matrix<double, 3, Eigen::Dynamic>& dst, double* scale,
     Eigen::Matrix<bool, 1, Eigen::Dynamic>* inliers) {
   // We assume no scale difference between the two vectors of points.
   *scale = 1;
 
   Eigen::Matrix<double, 1, Eigen::Dynamic> v1_dist =
-      src.array().square().colwise().sum().array().sqrt();
+      src.array().square().colwise().sum().array().sqrt();      /* 求内部Cn2两两的 L2范数*/
   Eigen::Matrix<double, 1, Eigen::Dynamic> v2_dist =
       dst.array().square().colwise().sum().array().sqrt();
   double beta = 2 * noise_bound_ * sqrt(cbar2_);
@@ -440,6 +440,9 @@ void teaser::ScaleInliersSelector::solveForScale(
   // A pair-wise correspondence is an inlier if it passes the following test:
   // abs(|dst| - |src|) is within maximum allowed error
   *inliers = (v1_dist.array() - v2_dist.array()).array().abs() <= beta;
+  /**   ∣l1​−l2​∣≤β ;这句话意思是：
+   * 这描述子匹配对齐的两团点云中，A团点云内组合数下两点的距离l1，与B团点云内组合数下两点的距离l2，
+   * 在合理噪声下应该是一致长度。挑出这一致的组合，证明这些配对的确是目标上的结构线，最后加到*inliers中*/
 }
 
 void teaser::TLSTranslationSolver::solveForTranslation(
@@ -510,12 +513,12 @@ teaser::RobustRegistrationSolver::RobustRegistrationSolver(
 }
 
 Eigen::Matrix<double, 3, Eigen::Dynamic>
-teaser::RobustRegistrationSolver::computeTIMs(const Eigen::Matrix<double, 3, Eigen::Dynamic>& v,
+teaser::RobustRegistrationSolver::computeTIMs(const Eigen::Matrix<double, 3, Eigen::Dynamic>& v,/* src原始 xyz*/
                                               Eigen::Matrix<int, 2, Eigen::Dynamic>* map) {
 
   auto N = v.cols();
-  Eigen::Matrix<double, 3, Eigen::Dynamic> vtilde(3, N * (N - 1) / 2);
-  map->resize(2, N * (N - 1) / 2);
+  Eigen::Matrix<double, 3, Eigen::Dynamic> vtilde(3, N * (N - 1) / 2);      // 组合数总数
+  map->resize(2, N * (N - 1) / 2);            // 组合数总数-1维
 
 #pragma omp parallel for shared(N, v, vtilde, map)
   for (size_t i = 0; i < N - 1; i++) {
@@ -528,12 +531,12 @@ teaser::RobustRegistrationSolver::computeTIMs(const Eigen::Matrix<double, 3, Eig
     // i=k: add N-1-k TIMs
     // And by arithmatic series, we can get the starting index of each segment be:
     // k*N - k*(k+1)/2
-    size_t segment_start_idx = i * N - i * (i + 1) / 2;
-    size_t segment_cols = N - 1 - i;
+    size_t segment_start_idx = i * N - i * (i + 1) / 2;     // 当前项的起始索引 表示还剩多少项： 把前 i 段粗略当成每段有 N 列时的总列数 -减去“多算”的部分（等差数列 1+2+…+i 的三角数）
+    size_t segment_cols = N - 1 - i;                        // 当前项的列数
 
     // calculate TIM
     Eigen::Matrix<double, 3, 1> m = v.col(i);
-    Eigen::Matrix<double, 3, Eigen::Dynamic> temp = v - m * Eigen::MatrixXd::Ones(1, N);
+    Eigen::Matrix<double, 3, Eigen::Dynamic> temp = v - m * Eigen::MatrixXd::Ones(1, N);    // 用本坨点云两两内点 求出一项组合数的差值
 
     // concatenate to the end of the tilde vector
     vtilde.middleCols(segment_start_idx, segment_cols) = temp.rightCols(segment_cols);
@@ -563,11 +566,11 @@ teaser::RobustRegistrationSolver::solve(const teaser::PointCloud& src_cloud,
     src.col(i) << src_cloud[src_idx].x, src_cloud[src_idx].y, src_cloud[src_idx].z;
     dst.col(i) << dst_cloud[dst_idx].x, dst_cloud[dst_idx].y, dst_cloud[dst_idx].z;
   }
-  return solve(src, dst);
+  return solve(src, dst);   
 }
 
 teaser::RegistrationSolution
-teaser::RobustRegistrationSolver::solve(const Eigen::Matrix<double, 3, Eigen::Dynamic>& src,
+teaser::RobustRegistrationSolver::solve(const Eigen::Matrix<double, 3, Eigen::Dynamic>& src,    /** 这里的src 和 dst 已经是特征匹配好了的 xyz点 */
                                         const Eigen::Matrix<double, 3, Eigen::Dynamic>& dst) {
   assert(scale_solver_ && rotation_solver_ && translation_solver_);
 
@@ -597,11 +600,11 @@ teaser::RobustRegistrationSolver::solve(const Eigen::Matrix<double, 3, Eigen::Dy
    *
    * Estimate Translation
    */
-  src_tims_ = computeTIMs(src, &src_tims_map_);   // 平移不变测量
-  dst_tims_ = computeTIMs(dst, &dst_tims_map_);
+  src_tims_ /** 三维点的TIM组合Cn2*/ = computeTIMs(src, &src_tims_map_);   // 平移不变测量
+  dst_tims_ = computeTIMs(dst, &dst_tims_map_);                          /** 单团点依次与内部其他点的坐标差 Cn2*/
   TEASER_DEBUG_INFO_MSG(
       "Starting scale solver (only selecting inliers if scale estimation has been disabled).");
-  solveForScale(src_tims_, dst_tims_);
+  solveForScale(src_tims_, dst_tims_);    //XXX 尺度相同掩码
   TEASER_DEBUG_INFO_MSG("Scale estimation complete.");
 
   // Calculate Maximum Clique
@@ -633,7 +636,7 @@ teaser::RobustRegistrationSolver::solve(const Eigen::Matrix<double, 3, Eigen::Dy
     clique_params.num_threads = params_.max_clique_num_threads;
 
     teaser::MaxCliqueSolver clique_solver(clique_params);
-    max_clique_ = clique_solver.findMaxClique(inlier_graph_);
+    max_clique_ /* std::vector<int>*/ = clique_solver.findMaxClique(inlier_graph_);
     std::sort(max_clique_.begin(), max_clique_.end());
     TEASER_DEBUG_INFO_MSG("Max Clique of scale estimation inliers: ");
 #ifndef NDEBUG
@@ -737,7 +740,7 @@ teaser::RobustRegistrationSolver::solve(const Eigen::Matrix<double, 3, Eigen::Dy
   return solution_;
 }
 
-double teaser::RobustRegistrationSolver::solveForScale(
+double teaser::RobustRegistrationSolver::solveForScale(       // 两坨点云的平移不变测量 x y z
     const Eigen::Matrix<double, 3, Eigen::Dynamic>& v1,
     const Eigen::Matrix<double, 3, Eigen::Dynamic>& v2) {
   scale_inliers_mask_.resize(1, v1.cols());
