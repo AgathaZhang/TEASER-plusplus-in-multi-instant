@@ -20,6 +20,8 @@
 #include <string>
 #include "teaser_cpp_fpfh.hpp"
 
+#include "lidar_compound.hpp"  // agatha add
+
 // ====== 你项目里已有的函数：仅做前向声明 ======
 // Eigen::Matrix4d map_icp_teaser_icp(
 //     const pcl::PointCloud<pcl::PointXYZINormal>::Ptr& cloud_source,
@@ -135,6 +137,22 @@ int main(int argc, char** argv)
   ros::init(argc, argv, "teaser_muilt_reg");
   ros::NodeHandle nh("~");
 
+  // XXX  ---------- 雷达静态长曝光点云合成 ----------
+
+  bool Livoxlidar_deal = true;
+  if (Livoxlidar_deal == true)
+  {
+    LivoxLongExposureBuilder builder(nh, "/livox/lidar");
+
+    // 例如：采 5 秒长曝光点云
+    auto cloud = builder.buildLongExposureCloud(5.0);
+
+    // 导出到指定路径
+    builder.saveCloudToPCD("/tmp/livox_long_exposure.pcd");
+
+  }
+  
+
   // ---------- 1) 读取参数 ----------
   
   std::string src_pcd = "/home/kilox/cloud_mapping/src/teaser_muilt_reg/data/clean_data/render_color_point_scene_2.pcd";
@@ -150,7 +168,7 @@ int main(int argc, char** argv)
 
   double leaf_xyz_inormal = 0.02;   // 第一阶段：对 target(PointXYZINormal) 做体素滤波
   double leaf_xyz         = 0.10;   // 第二阶段：对 XYZ 再体素
-  double teaser_scale     = 10.0;   // 你代码里 ld_map_icp_teaser_scale
+  double teaser_scale     = 12.0;   //XXX 11.17 10.0你代码里 ld_map_icp_teaser_scale 
 
   nh.param<std::string>("src_pcd", src_pcd, src_pcd/* 默认值*/);
   nh.param<std::string>("tgt_pcd", tgt_pcd, tgt_pcd);

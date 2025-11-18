@@ -425,7 +425,7 @@ void teaser::TLSScaleSolver::solveForScale(const Eigen::Matrix<double, 3, Eigen:
 }
 
 void teaser::ScaleInliersSelector::solveForScale(
-    const Eigen::Matrix<double, 3, Eigen::Dynamic>& src,  /** 三维点的TIM组合Cn2*/
+    const Eigen::Matrix<double, 3, Eigen::Dynamic>& src,  /** 三维点的TIM组合Cn2 团内两点坐标之差*/ // 即 物体结构上的平移不变向量
     const Eigen::Matrix<double, 3, Eigen::Dynamic>& dst, double* scale,
     Eigen::Matrix<bool, 1, Eigen::Dynamic>* inliers) {
   // We assume no scale difference between the two vectors of points.
@@ -439,10 +439,11 @@ void teaser::ScaleInliersSelector::solveForScale(
 
   // A pair-wise correspondence is an inlier if it passes the following test:
   // abs(|dst| - |src|) is within maximum allowed error
-  *inliers = (v1_dist.array() - v2_dist.array()).array().abs() <= beta;
+  *inliers = (v1_dist.array() - v2_dist.array()).array().abs() <= beta;   /** inliers是掩码*/ //TODO 这里这个beta是容忍误差范围 要根据物体尺度来？
   /**   ∣l1​−l2​∣≤β ;这句话意思是：
    * 这描述子匹配对齐的两团点云中，A团点云内组合数下两点的距离l1，与B团点云内组合数下两点的距离l2，
-   * 在合理噪声下应该是一致长度。挑出这一致的组合，证明这些配对的确是目标上的结构线，最后加到*inliers中*/
+   * 在合理噪声下应该是一致长度。挑出这一致的组合，证明这些配对的确是目标上的结构线，最后加到*inliers中
+   * 筛选了两团点云上的平移不变向量 */
 }
 
 void teaser::TLSTranslationSolver::solveForTranslation(
@@ -513,7 +514,7 @@ teaser::RobustRegistrationSolver::RobustRegistrationSolver(
 }
 
 Eigen::Matrix<double, 3, Eigen::Dynamic>
-teaser::RobustRegistrationSolver::computeTIMs(const Eigen::Matrix<double, 3, Eigen::Dynamic>& v,/* src原始 xyz*/
+teaser::RobustRegistrationSolver::computeTIMs(const Eigen::Matrix<double, 3, Eigen::Dynamic>& v,/** src原始 xyz*/
                                               Eigen::Matrix<int, 2, Eigen::Dynamic>* map) {
 
   auto N = v.cols();
@@ -600,11 +601,11 @@ teaser::RobustRegistrationSolver::solve(const Eigen::Matrix<double, 3, Eigen::Dy
    *
    * Estimate Translation
    */
-  src_tims_ /** 三维点的TIM组合Cn2*/ = computeTIMs(src, &src_tims_map_);   // 平移不变测量
-  dst_tims_ = computeTIMs(dst, &dst_tims_map_);                          /** 单团点依次与内部其他点的坐标差 Cn2*/
+  src_tims_ /** 三维点的TIM 坐标差 Cn2*/ = computeTIMs(src, &src_tims_map_/** Cn2索引*/);   // 平移不变测量
+  dst_tims_ = computeTIMs(dst, &dst_tims_map_);                     /** 单团点依次与内部其他点的坐标差 Cn2*/
   TEASER_DEBUG_INFO_MSG(
       "Starting scale solver (only selecting inliers if scale estimation has been disabled).");
-  solveForScale(src_tims_, dst_tims_);    //XXX 尺度相同掩码
+  solveForScale(src_tims_, dst_tims_);    //XXX 尺度相同掩码 去除外点错匹配 如两根板凳交叉
   TEASER_DEBUG_INFO_MSG("Scale estimation complete.");
 
   // Calculate Maximum Clique
@@ -615,28 +616,28 @@ teaser::RobustRegistrationSolver::solve(const Eigen::Matrix<double, 3, Eigen::Dy
     // Create inlier graph: A graph with (indices of) original measurements as vertices, and edges
     // only when the TIM between two measurements are inliers. Note: src_tims_map_ is the same as
     // dst_tim_map_
-    inlier_graph_.populateVertices(src.cols());
+    inlier_graph_.populateVertices(src.cols());                           // 原始匹配对数量 设置顶点
     for (size_t i = 0; i < scale_inliers_mask_.cols(); ++i) {
       if (scale_inliers_mask_(0, i)) {
-        inlier_graph_.addEdge(src_tims_map_(0, i), src_tims_map_(1, i));
+        inlier_graph_.addEdge(src_tims_map_(0, i), src_tims_map_(1, i));  /** 团内两点∣∥vj​−vi​∥−∥uj​−ui​∥∣≤β 确定下来的 边*/ // 顶点加边
       }
     }
 
     teaser::MaxCliqueSolver::Params clique_params;
 
     if (params_.inlier_selection_mode == INLIER_SELECTION_MODE::PMC_EXACT) {
-      clique_params.solver_mode = teaser::MaxCliqueSolver::CLIQUE_SOLVER_MODE::PMC_EXACT;
+      clique_params.solver_mode = teaser::MaxCliqueSolver::CLIQUE_SOLVER_MODE::PMC_EXACT;     // 精确求解最稳最慢
     } else if (params_.inlier_selection_mode == INLIER_SELECTION_MODE::PMC_HEU) {
-      clique_params.solver_mode = teaser::MaxCliqueSolver::CLIQUE_SOLVER_MODE::PMC_HEU;
+      clique_params.solver_mode = teaser::MaxCliqueSolver::CLIQUE_SOLVER_MODE::PMC_HEU;        // 近似求解较快 解可能非最优
     } else {
-      clique_params.solver_mode = teaser::MaxCliqueSolver::CLIQUE_SOLVER_MODE::KCORE_HEU;
+      clique_params.solver_mode = teaser::MaxCliqueSolver::CLIQUE_SOLVER_MODE::KCORE_HEU;       // 先做 k-core 规约 的启发式，进一步提速，最偏近似
     }
-    clique_params.time_limit = params_.max_clique_time_limit;
-    clique_params.kcore_heuristic_threshold = params_.kcore_heuristic_threshold;
-    clique_params.num_threads = params_.max_clique_num_threads;
+    clique_params.time_limit = params_.max_clique_time_limit;                         // 最大求解时间
+    clique_params.kcore_heuristic_threshold = params_.kcore_heuristic_threshold;      // k-core 阈值：小于该度数的节点会被剔除（图规约），阈值越高，剪枝越激进、越快，但可能丢真内点。
+    clique_params.num_threads = params_.max_clique_num_threads;                       // 线程数 目前是32
 
     teaser::MaxCliqueSolver clique_solver(clique_params);
-    max_clique_ /* std::vector<int>*/ = clique_solver.findMaxClique(inlier_graph_);
+    max_clique_ /* std::vector<int>*/ = clique_solver.findMaxClique(inlier_graph_);   // 找到最大内点
     std::sort(max_clique_.begin(), max_clique_.end());
     TEASER_DEBUG_INFO_MSG("Max Clique of scale estimation inliers: ");
 #ifndef NDEBUG

@@ -37,6 +37,7 @@ set(TEASER_INC_DIR      ${TEASER_ROOT}/include)                  # 1 核心头�
 set(TEASER_SRC_DIR      ${TEASER_ROOT}/src)                      # 1 核心源文件实现
 set(TEASER_BENCH_DIR    ${TEASER_ROOT}/spectra/benchmark)        # **benchmark 根目录
 
+set(COMPOUND_DIR        ${CMAKE_CURRENT_SOURCE_DIR}/include)      # **compound agatha自定义工程组件根目录
 
 set(TEASER_TINYPLY_TP_INC   ${TEASER_ROOT}/tinyply/third-party)  # 2 tinyply 第三方头文件
 
@@ -54,6 +55,7 @@ set(TEASER_EXAMPLES     ${TEASER_ROOT}/../examples/teaser_cpp_fpfh)   # /*teaser
 
 # 头文件整合
 set(_TEASER_INC_CANDIDATES
+  ${COMPOUND_DIR}              # **compound 自定义工程组件根目录
   ${TEASER_INC_DIR}            # 1 核心头文件
   ${TEASER_TINYPLY_TP_INC}     # 2 tinyply 第三方头文件
   ${TEASER_PMC_INC}            # 3 pmc 模块头文件
@@ -120,6 +122,7 @@ endif()
 # ========= 你的工程源码 =========
 set(SRC_NODE
   src/teaser_muilt_reg_node.cpp
+  src/lidar_compound.cpp
 )
 
 # 若你的实现文件存在则自动加入（避免未定义引用）

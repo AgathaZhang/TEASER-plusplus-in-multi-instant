@@ -98,8 +98,8 @@ public:
       TEASER_DEBUG_ERROR_MSG("Edge exists.");
       return;
     }
-    adj_list_[vertex_1].push_back(vertex_2);
-    adj_list_[vertex_2].push_back(vertex_1);
+    adj_list_[vertex_1].push_back(vertex_2);      // undirected graph 
+    adj_list_[vertex_2].push_back(vertex_1);      // 对端索引
     num_edges_++;
   }
 
@@ -202,8 +202,8 @@ public:
   }
 
 private:
-  std::vector<std::vector<int>> adj_list_;
-  size_t num_edges_;
+  std::vector<std::vector<int>> adj_list_;    // 邻接表 adjacency list 边定义 内层vector存了所有相连的点
+  size_t num_edges_;                          /** 外层按顶点 0..N-1；内层 vector<int> 存该顶点相邻的顶点ID（每个条目表示一条与该顶点相连的边的对端）。无向图里一条边 (u,v) 会在 adj_list_[u] 和 adj_list_[v] 各出现一次*/
 };
 
 /**

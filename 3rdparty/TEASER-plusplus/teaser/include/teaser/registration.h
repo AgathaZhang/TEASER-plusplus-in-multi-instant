@@ -918,9 +918,9 @@ private:
   RegistrationSolution solution_;
 
   // Inlier Binary Vectors
-  Eigen::Matrix<bool, 1, Eigen::Dynamic> scale_inliers_mask_;
-  Eigen::Matrix<bool, 1, Eigen::Dynamic> rotation_inliers_mask_;
-  Eigen::Matrix<bool, 1, Eigen::Dynamic> translation_inliers_mask_;
+  Eigen::Matrix<bool, 1, Eigen::Dynamic> scale_inliers_mask_;         // 尺度阶段（TIM 长度一致性）判定为内点的点对
+  Eigen::Matrix<bool, 1, Eigen::Dynamic> rotation_inliers_mask_;      // 旋转阶段（TIM 方向一致性）判定为内点的点对
+  Eigen::Matrix<bool, 1, Eigen::Dynamic> translation_inliers_mask_;   // 平移阶段（TIM 位置一致性）判定为内点的点对
 
   // TIMs
   // TIMs used for scale estimation/pruning

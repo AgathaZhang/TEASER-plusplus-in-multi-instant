@@ -16,12 +16,12 @@ std::vector<int> teaser::MaxCliqueSolver::findMaxClique(teaser::Graph graph) {
     params_.solver_mode = CLIQUE_SOLVER_MODE::PMC_HEU;
   }
 
-  // Create a PMC graph from the TEASER graph
-  std::vector<int> edges;
-  std::vector<long long> vertices;
-  vertices.push_back(edges.size());
+  // Create a PMC graph from the TEASER graph    /** PMC = Parallel Maximum Clique（并行最大团）*/
+  std::vector<int> edges;                        // undirected edges list
+  std::vector<long long> vertices;               // vertex pointer list   
+  vertices.push_back(edges.size());              // starting from vertex 0
 
-  const auto all_vertices = graph.getVertices();
+  const auto all_vertices = graph.getVertices(); // get all vertex ids
   for (const auto& i : all_vertices) {
     const auto& c_edges = graph.getEdges(i);
     edges.insert(edges.end(), c_edges.begin(), c_edges.end());
@@ -29,7 +29,7 @@ std::vector<int> teaser::MaxCliqueSolver::findMaxClique(teaser::Graph graph) {
   }
 
   // Use PMC to calculate
-  pmc::pmc_graph G(vertices, edges);
+  pmc::pmc_graph G(vertices, edges);   // CSR（压缩行存储）格式的图结构
 
   // Prepare PMC input
   // TODO: Incorporate this to the constructor
@@ -52,11 +52,11 @@ std::vector<int> teaser::MaxCliqueSolver::findMaxClique(teaser::Graph graph) {
   in.vertex_search_order = "deg";
 
   // vector to represent max clique
-  std::vector<int> C;
-
+  std::vector<int> C;       // 最大团的顶点集合 顶点 ID 列表
+  // TODO 原理未看 11.17
   // upper-bound of max clique
-  G.compute_cores();
-  auto max_core = G.get_max_core();
+  G.compute_cores();        // 对图做 k-core 分解（逐步删去度 < k 的点）为每个顶点计算其 core number。
+  auto max_core = G.get_max_core(); // 图的最大 core number
 
   TEASER_DEBUG_INFO_MSG("Max core number: " << max_core);
   TEASER_DEBUG_INFO_MSG("Num vertices: " << vertices.size());
@@ -64,12 +64,16 @@ std::vector<int> teaser::MaxCliqueSolver::findMaxClique(teaser::Graph graph) {
   // check for k-core heuristic threshold
   // check whether threshold equals 1 to short circuit the comparison
   if (params_.solver_mode == CLIQUE_SOLVER_MODE::KCORE_HEU &&
-      params_.kcore_heuristic_threshold != 1 &&
-      max_core > static_cast<int>(params_.kcore_heuristic_threshold *
+      params_.kcore_heuristic_threshold != 1 &&                        // 度数乘法系数为0.5 似乎是大于一半的点
+      max_core > static_cast<int>(params_.kcore_heuristic_threshold *             
                                   static_cast<double>(all_vertices.size()))) {
     TEASER_DEBUG_INFO_MSG("Using K-core heuristic finder.");
     // remove all nodes with core number less than max core number
     // k_cores is a vector saving the core number of each vertex
+
+    /** 核数（core number）定义：
+    对无向图，k-core 是“每个顶点度数都 ≥ k”的最大子图。一个顶点的核数就是它能属于的最大 k 值
+    （从图里不断剥去度 < k 的点，直到稳定；该点最后停留的最大 k）。*/
     auto k_cores = G.get_kcores();
     for (int i = 1; i < k_cores->size(); ++i) {
       // Note: k_core has size equals to num vertices + 1
