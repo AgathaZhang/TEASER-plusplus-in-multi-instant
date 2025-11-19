@@ -122,7 +122,8 @@ endif()
 # ========= 你的工程源码 =========
 set(SRC_NODE
   src/teaser_muilt_reg_node.cpp
-  src/lidar_compound.cpp
+  src/lidar_compound.cpp          # 实时处理帧同步
+  src/lidar_frame_syn.cpp         # 文件读取并帧同步     
 )
 
 # 若你的实现文件存在则自动加入（避免未定义引用）

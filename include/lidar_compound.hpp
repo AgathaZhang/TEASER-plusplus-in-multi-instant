@@ -9,6 +9,17 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 
+#include <Eigen/Dense>  // agatha add这一部分是 SE3->SE2 转换需要的头文件
+#include <cmath>
+
+// struct SE2
+// {
+//   float x;
+//   float y;
+//   float theta;
+// };
+std::pair<double, double> decomposeYawPitch(const Eigen::Matrix4d& T_bg);
+
 class LivoxLongExposureBuilder {
 public:
   using PointT      = pcl::PointXYZI;

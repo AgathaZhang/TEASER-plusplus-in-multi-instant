@@ -907,10 +907,16 @@ int main2() {
   // Apply an arbitrary SE(3) transformation
   Eigen::Matrix4d T;
   // clang-format off
-  T << 9.96926560e-01,  6.68735757e-02, -4.06664421e-02, -1.15576939e-01,
-      -6.61289946e-02, 9.97617877e-01,  1.94008687e-02, -3.87705398e-02,
-      4.18675510e-02, -1.66517807e-02,  9.98977765e-01, 1.14874890,
-      0,              0,                0,              1;
+//   T << 9.96926560e-01,  6.68735757e-02, -4.06664421e-02, -1.15576939e-01,
+//       -6.61289946e-02, 9.97617877e-01,  1.94008687e-02, -3.87705398e-02,
+//       4.18675510e-02, -1.66517807e-02,  9.98977765e-01, 1.14874890,
+//       0,              0,                0,              1;
+
+  T << 1, 0, 0, -0,
+      0, 1, 0, -0,
+      0, 0, 1, 0,
+      0, 0, 0, 1;
+
   // clang-format on
   // Apply transformation
   //Eigen::Matrix<double, 4, Eigen::Dynamic> tgt_h = src_h_tgt;
@@ -955,6 +961,35 @@ int main2() {
   std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
 
   auto solution = solver.getSolution();
+  std::pair<double, double> decomposeYawPitch(const Eigen::Matrix3d& R);
+  auto [yaw, pitch] = decomposeYawPitch(solution.rotation);
+  std::cout << "Yuntai Estimated yaw (deg): " << yaw * 180.0 / M_PI << std::endl;
+  std::cout << "Yuntai Estimated pitch (deg): " << pitch * 180.0 / M_PI << std::endl;
+  // Compare results
+  std::cout << "=====================================" << std::endl;
+  std::cout << "          TEASER++ Results           " << std::endl;
+  std::cout << "=====================================" << std::endl;
+  std::cout << "Expected rotation: " << std::endl;
+  std::cout << T.topLeftCorner(3, 3) << std::endl;
+  std::cout << "Estimated rotation: " << std::endl;
+  std::cout << solution.rotation << std::endl;
+  std::cout << "Error (deg): " << getAngularError(T.topLeftCorner(3, 3), solution.rotation)
+            << std::endl;
+  std::cout << "Error (rad): " << getAngularError(T.topLeftCorner(3, 3), solution.rotation) * 180.0 / M_PI
+            << std::endl;
+  std::cout << std::endl;
+  std::cout << "Expected translation: " << std::endl;
+  std::cout << T.topRightCorner(3, 1) << std::endl;
+  std::cout << "Estimated translation: " << std::endl;
+  std::cout << solution.translation << std::endl;
+  std::cout << "Error (m): " << (T.topRightCorner(3, 1) - solution.translation).norm() << std::endl;
+  std::cout << std::endl;
+  std::cout << "Number of correspondences: " << N << std::endl;
+  std::cout << "Number of outliers: " << N_OUTLIERS << std::endl;
+  std::cout << "Time taken (s): "
+            << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() /
+                   1000000.0
+            << std::endl;
 
   Eigen::Vector3d t_so = solution.translation;
   Eigen::Matrix3d R_so = solution.rotation;

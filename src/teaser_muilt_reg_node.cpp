@@ -21,6 +21,7 @@
 #include "teaser_cpp_fpfh.hpp"
 
 #include "lidar_compound.hpp"  // agatha add
+#include "lidar_frame_syn.hpp"
 
 // ====== 你项目里已有的函数：仅做前向声明 ======
 // Eigen::Matrix4d map_icp_teaser_icp(
@@ -142,21 +143,24 @@ int main(int argc, char** argv)
   bool Livoxlidar_deal = true;
   if (Livoxlidar_deal == true)
   {
-    LivoxLongExposureBuilder builder(nh, "/livox/lidar");
+    LidarFrameSyn syn("/livox/lidar");
 
-    // 例如：采 5 秒长曝光点云
-    auto cloud = builder.buildLongExposureCloud(5.0);
+    // 例如：从 rosbag 中叠加最多 5 秒点云
+    auto cloud = syn.buildLongExposureCloudFromBag("/home/kilox/cloud_mapping/src/teaser_muilt_reg/data/lidar_output/base1.bag", 5.0);
 
-    // 导出到指定路径
-    builder.saveCloudToPCD("/tmp/livox_long_exposure.pcd");
-
+    // 导出 PCD（可选）
+    syn.saveCloudToPCD("/home/kilox/cloud_mapping/src/teaser_muilt_reg/data/livox_lidar/base1.pcd");
   }
   
 
   // ---------- 1) 读取参数 ----------
-  
-  std::string src_pcd = "/home/kilox/cloud_mapping/src/teaser_muilt_reg/data/clean_data/render_color_point_scene_2.pcd";
-  std::string tgt_pcd = "/home/kilox/cloud_mapping/src/teaser_muilt_reg/data/clean_data/render_color_point_car_1.pcd";
+  // FIXME 测试D21
+  // std::string src_pcd = "/home/kilox/cloud_mapping/src/teaser_muilt_reg/data/clean_data/render_color_point_scene_2.pcd";
+  // std::string tgt_pcd = "/home/kilox/cloud_mapping/src/teaser_muilt_reg/data/clean_data/render_color_point_car_1.pcd";
+  // FIXME 测试用长曝光点云
+  std::string src_pcd = "/home/kilox/cloud_mapping/src/teaser_muilt_reg/data/lidar_output/base.pcd";
+  std::string tgt_pcd = "/home/kilox/cloud_mapping/src/teaser_muilt_reg/data/lidar_output/base1.pcd";
+
   // std::string tgt_pcd = "/home/kilox/catkin_r3live/data/fire2/shitang_map.pcd";
   // std::string src_pcd/*out_pcd1 转换ply时配合使用*/ = "/home/kilox/cloud_mapping/src/teaser_muilt_reg/data/output/transformed_cloud_ply_1.pcd";
   // std::string tgt_pcd/*out_pcd2*/ = "/home/kilox/cloud_mapping/src/teaser_muilt_reg/data/output/transformed_cloud_ply_2.pcd";
